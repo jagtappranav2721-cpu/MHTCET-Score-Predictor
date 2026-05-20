@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MHT-CET Score Predictor & Analyzer | State Common Entrance Test</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts: Syne (display) + JetBrains Mono (data) + Inter (body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['Syne', 'sans-serif'],
+            mono:    ['JetBrains Mono', 'monospace'],
+            body:    ['Inter', 'sans-serif'],
+          },
+          colors: {
+            navy:  { 950: '#040c1a', 900: '#071428', 800: '#0c1f3f', 700: '#112952', 600: '#163466' },
+            cyan:  { 400: '#22d3ee', 500: '#06b6d4', 600: '#0891b2' },
+            emerald: { 400: '#34d399', 500: '#10b981' },
+            rose:  { 400: '#fb7185', 500: '#f43f5e' },
+            amber: { 400: '#fbbf24', 500: '#f59e0b' },
+          },
+          animation: {
+            'fade-up':    'fadeUp 0.5s ease forwards',
+            'fade-in':    'fadeIn 0.4s ease forwards',
+            'pulse-slow': 'pulse 3s cubic-bezier(0.4,0,0.6,1) infinite',
+            'spin-slow':  'spin 8s linear infinite',
+          },
+          keyframes: {
+            fadeUp:  { '0%': { opacity: '0', transform: 'translateY(20px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+            fadeIn:  { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+          },
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* ─── Global Reset & Base ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #040c1a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ─── Background grid texture ─────────────────────────────────────── */
+    .bg-grid {
+      background-image:
+        linear-gradient(rgba(34,211,238,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(34,211,238,0.035) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    /* ─── Noise overlay ───────────────────────────────────────────────── */
+    .noise::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.4;
+    }
+
+    /* ─── Glow effects ────────────────────────────────────────────────── */
+    .glow-cyan  { box-shadow: 0 0 30px rgba(34,211,238,0.15), 0 0 60px rgba(34,211,238,0.05); }
+    .glow-text  { text-shadow: 0 0 20px rgba(34,211,238,0.4); }
+    .glow-ring  { box-shadow: 0 0 0 1px rgba(34,211,238,0.2), inset 0 0 30px rgba(34,211,238,0.03); }
+
+    /* ─── Glass card ──────────────────────────────────────────────────── */
+    .glass {
+      background: rgba(7, 20, 40, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(34, 211, 238, 0.12);
+    }
+
+    /* ─── Dropzone ────────────────────────────────────────────────────── */
+    #dropzone {
+      border: 2px dashed rgba(34,211,238,0.25);
+      transition: all 0.3s ease;
+    }
+    #dropzone.drag-over {
+      border-color: rgba(34,211,238,0.8);
+      background: rgba(34,211,238,0.06);
+      box-shadow: 0 0 40px rgba(34,211,238,0.15), inset 0 0 40px rgba(34,211,238,0.04);
+      transform: scale(1.01);
+    }
+
+    /* ─── Circular Score Ring ─────────────────────────────────────────── */
+    .score-ring {
+      position: relative;
+      width: 200px;
+      height: 200px;
+    }
+    .score-ring svg { transform: rotate(-90deg); }
+    .score-ring-bg  { fill: none; stroke: rgba(34,211,238,0.1); stroke-width: 8; }
+    .score-ring-fg  {
+      fill: none; stroke: #22d3ee; stroke-width: 8;
+      stroke-linecap: round;
+      stroke-dasharray: 565.48; /* 2π × 90 */
+      stroke-dashoffset: 565.48;
+      transition: stroke-dashoffset 1.4s cubic-bezier(0.4, 0, 0.2, 1);
+      filter: drop-shadow(0 0 6px rgba(34,211,238,0.6));
+    }
+    .score-ring-center {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ─── Progress Bar ────────────────────────────────────────────────── */
+    .prog-bar { transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1); }
+
+    /* ─── Table zebra ─────────────────────────────────────────────────── */
+    .tbl-correct   { background: rgba(52,211,153,0.07);  border-left: 3px solid #34d399; }
+    .tbl-incorrect { background: rgba(251,113,133,0.07); border-left: 3px solid #fb7185; }
+    .tbl-skipped   { background: rgba(100,116,139,0.05); border-left: 3px solid rgba(100,116,139,0.3); }
+
+    /* ─── Toast ───────────────────────────────────────────────────────── */
+    #toast {
+      transition: transform 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.4s ease;
+      transform: translateY(100px);
+      opacity: 0;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+
+    /* ─── Section animation delays ────────────────────────────────────── */
+    .stagger-1 { animation-delay: 0.05s; }
+    .stagger-2 { animation-delay: 0.15s; }
+    .stagger-3 { animation-delay: 0.25s; }
+    .stagger-4 { animation-delay: 0.35s; }
+    .stagger-5 { animation-delay: 0.45s; }
+
+    /* ─── Scrollbar ───────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #040c1a; }
+    ::-webkit-scrollbar-thumb { background: rgba(34,211,238,0.2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(34,211,238,0.4); }
+
+    /* Hide sections by default */
+    #upload-view, #results-view { display: none; }
+    #upload-view.active { display: block; }
+    #results-view.active { display: block; }
+  </style>
+</head>
+
+<body class="bg-grid noise">
+
+  <!-- ═══════════════════════════════════════════════════════════
+       HEADER
+  ════════════════════════════════════════════════════════════════ -->
+  <header class="relative z-10 border-b border-cyan-400/10">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+
+      <!-- Logo -->
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-cyan-400/10 border border-cyan-400/30 flex items-center justify-center glow-cyan">
+          <svg class="w-5 h-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+          </svg>
+        </div>
+        <div>
+          <span class="font-display text-white text-lg leading-none tracking-tight">MHT-CET</span>
+          <span class="font-display text-cyan-400 text-lg leading-none tracking-tight ml-1.5">Analyzer</span>
+        </div>
+      </div>
+
+      <!-- Privacy badge -->
+      <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/5 text-xs font-mono text-emerald-400">
+        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+        </svg>
+        100% Client-Side · Zero Data Sent
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       MAIN CONTENT WRAPPER
+  ════════════════════════════════════════════════════════════════ -->
+  <main class="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-10">
+
+    <!-- ─────────────────────────────────────────────────────────
+         VIEW 1: UPLOAD
+    ────────────────────────────────────────────────────────────── -->
+    <div id="upload-view" class="active">
+
+      <!-- Hero text -->
+      <div class="text-center mb-10">
+        <p class="font-mono text-cyan-400/60 text-xs tracking-[0.25em] uppercase mb-3">State Common Entrance Test · Maharashtra</p>
+        <h1 class="font-display text-4xl sm:text-5xl text-white leading-tight mb-4">
+          Analyze Your <span class="text-cyan-400 glow-text">MHT-CET</span><br/>Response Sheet
+        </h1>
+        <p class="font-body text-slate-400 text-base max-w-xl mx-auto leading-relaxed">
+          Upload your official <code class="font-mono text-cyan-400/80 text-sm bg-cyan-400/10 px-1.5 py-0.5 rounded">.mht</code> response file.
+          Get instant score, subject breakdown, and a question-by-question analysis — all processed privately in your browser.
+        </p>
+      </div>
+
+      <!-- How-to steps -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10 max-w-3xl mx-auto">
+        <div class="glass rounded-xl p-4 text-center">
+          <div class="w-8 h-8 rounded-full bg-cyan-400/10 border border-cyan-400/20 flex items-center justify-center mx-auto mb-3 font-mono text-cyan-400 text-sm font-semibold">1</div>
+          <p class="text-xs text-slate-400 leading-relaxed">Login to <span class="text-white">cetcell.mahacet.org</span> and open your response sheet</p>
+        </div>
+        <div class="glass rounded-xl p-4 text-center">
+          <div class="w-8 h-8 rounded-full bg-cyan-400/10 border border-cyan-400/20 flex items-center justify-center mx-auto mb-3 font-mono text-cyan-400 text-sm font-semibold">2</div>
+          <p class="text-xs text-slate-400 leading-relaxed">Press <kbd class="bg-slate-700 text-white px-1 rounded text-xs">Ctrl+S</kbd> → Save as <span class="text-white">Web Archive (.mht)</span></p>
+        </div>
+        <div class="glass rounded-xl p-4 text-center">
+          <div class="w-8 h-8 rounded-full bg-cyan-400/10 border border-cyan-400/20 flex items-center justify-center mx-auto mb-3 font-mono text-cyan-400 text-sm font-semibold">3</div>
+          <p class="text-xs text-slate-400 leading-relaxed">Drop the saved <span class="font-mono text-cyan-400">.mht</span> file into the zone below</p>
+        </div>
+      </div>
+
+      <!-- ── Shift Selector ── -->
+      <div class="glass rounded-2xl p-5 mb-6 max-w-2xl mx-auto">
+        <p class="font-mono text-xs text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+          <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          Select Your Exam Shift for Percentile Prediction
+        </p>
+        <div class="grid grid-cols-2 gap-4">
+          <!-- Date -->
+          <div>
+            <label class="font-mono text-xs text-slate-400 mb-1.5 block">Exam Date</label>
+            <div class="relative">
+              <select id="shift-date" class="w-full appearance-none bg-slate-900 border border-slate-700 text-white font-mono text-sm rounded-xl px-4 py-2.5 pr-10 focus:outline-none focus:border-cyan-400/60 focus:ring-1 focus:ring-cyan-400/30 transition-all cursor-pointer">
+                <option value="">— Select date —</option>
+                <option value="11 Apr">11 April</option>
+                <option value="13 Apr">13 April</option>
+                <option value="15 Apr">15 April</option>
+                <option value="16 Apr">16 April</option>
+                <option value="17 Apr">17 April</option>
+                <option value="18 Apr">18 April</option>
+                <option value="19 Apr">19 April</option>
+                <option value="20 Apr">20 April</option>
+              </select>
+              <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+          </div>
+          <!-- Shift -->
+          <div>
+            <label class="font-mono text-xs text-slate-400 mb-1.5 block">Shift</label>
+            <div class="relative">
+              <select id="shift-slot" class="w-full appearance-none bg-slate-900 border border-slate-700 text-white font-mono text-sm rounded-xl px-4 py-2.5 pr-10 focus:outline-none focus:border-cyan-400/60 focus:ring-1 focus:ring-cyan-400/30 transition-all cursor-pointer">
+                <option value="">— Select shift —</option>
+                <option value="Shift 1">Shift 1 (Morning)</option>
+                <option value="Shift 2">Shift 2 (Afternoon)</option>
+              </select>
+              <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+          </div>
+        </div>
+        <!-- Preview pill – shows difficulty once both selected -->
+        <div id="shift-preview" class="hidden mt-3 flex items-center gap-2 text-xs font-mono">
+          <span class="text-slate-500">Detected difficulty:</span>
+          <span id="shift-difficulty-badge" class="px-2.5 py-0.5 rounded-full font-semibold"></span>
+          <span id="shift-remark" class="text-slate-500 italic"></span>
+        </div>
+        <p class="font-mono text-xs text-slate-600 mt-3">⚠ Optional but recommended — enables accurate percentile estimation based on shift difficulty normalisation.</p>
+      </div>
+
+      <!-- Dropzone -->
+      <div
+        id="dropzone"
+        class="relative rounded-2xl p-10 sm:p-16 text-center cursor-pointer max-w-2xl mx-auto glow-ring"
+        style="background: rgba(7,20,40,0.5);"
+        onclick="document.getElementById('file-input').click()"
+      >
+        <!-- Decorative corner accents -->
+        <span class="absolute top-3 left-3 w-4 h-4 border-t-2 border-l-2 border-cyan-400/40 rounded-tl"></span>
+        <span class="absolute top-3 right-3 w-4 h-4 border-t-2 border-r-2 border-cyan-400/40 rounded-tr"></span>
+        <span class="absolute bottom-3 left-3 w-4 h-4 border-b-2 border-l-2 border-cyan-400/40 rounded-bl"></span>
+        <span class="absolute bottom-3 right-3 w-4 h-4 border-b-2 border-r-2 border-cyan-400/40 rounded-br"></span>
+
+        <!-- Upload icon -->
+        <div class="w-20 h-20 rounded-2xl bg-cyan-400/8 border border-cyan-400/20 flex items-center justify-center mx-auto mb-6 glow-cyan">
+          <svg class="w-10 h-10 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+          </svg>
+        </div>
+
+        <h2 class="font-display text-white text-xl mb-2">Drop your .mht file here</h2>
+        <p class="text-slate-500 text-sm mb-6">or click anywhere in this zone to browse</p>
+
+        <!-- File type badge -->
+        <div class="inline-flex items-center gap-2 font-mono text-xs text-slate-400 border border-slate-700 rounded-full px-4 py-2 mb-6">
+          <svg class="w-3.5 h-3.5 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/></svg>
+          Accepts: .mht / .mhtml files
+        </div>
+
+        <!-- Security note -->
+        <div class="flex items-center justify-center gap-2 text-xs text-emerald-400/80">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+          🔒 100% Secure — your file never leaves your device
+        </div>
+
+        <input type="file" id="file-input" accept=".mht,.mhtml" class="hidden" />
+      </div>
+
+      <!-- Loading state (hidden by default) -->
+      <div id="loading-state" class="hidden text-center mt-8">
+        <div class="inline-flex flex-col items-center gap-4">
+          <div class="relative w-14 h-14">
+            <div class="absolute inset-0 rounded-full border-2 border-cyan-400/20"></div>
+            <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-cyan-400 animate-spin"></div>
+          </div>
+          <div>
+            <p class="font-mono text-cyan-400 text-sm font-medium" id="loading-msg">Decoding MHTML archive…</p>
+            <p class="text-slate-500 text-xs mt-1">Parsing question data client-side</p>
+          </div>
+        </div>
+      </div>
+
+    </div> <!-- /upload-view -->
+
+
+    <!-- ─────────────────────────────────────────────────────────
+         VIEW 2: RESULTS DASHBOARD
+    ────────────────────────────────────────────────────────────── -->
+    <div id="results-view">
+
+      <!-- Top bar: file name + reset -->
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4 opacity-0 animate-fade-up stagger-1" style="opacity:0">
+        <div>
+          <p class="font-mono text-xs text-slate-500 uppercase tracking-widest mb-1">Analysis Complete</p>
+          <h2 class="font-display text-2xl text-white">Your Score Report</h2>
+          <p class="font-mono text-xs text-cyan-400/60 mt-1" id="file-name-display"></p>
+        </div>
+        <button
+          id="reset-btn"
+          class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-700 text-slate-400 hover:border-cyan-400/40 hover:text-cyan-400 transition-all text-sm font-mono"
+          onclick="resetApp()"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          Upload Another File
+        </button>
+      </div>
+
+      <!-- ── ROW 1: Hero score + stat cards ── -->
+      <div class="grid grid-cols-1 lg:grid-cols-4 gap-5 mb-6">
+
+        <!-- Hero score ring -->
+        <div class="lg:col-span-1 glass rounded-2xl p-6 flex flex-col items-center justify-center glow-cyan opacity-0 animate-fade-up stagger-2" style="opacity:0">
+          <p class="font-mono text-xs text-slate-500 uppercase tracking-widest mb-5">Total Score</p>
+          <div class="score-ring mb-4">
+            <svg viewBox="0 0 200 200" width="200" height="200">
+              <circle class="score-ring-bg" cx="100" cy="100" r="90"/>
+              <circle class="score-ring-fg" id="score-ring-fg" cx="100" cy="100" r="90"/>
+            </svg>
+            <div class="score-ring-center">
+              <span class="font-display text-4xl text-white leading-none" id="score-display">—</span>
+              <span class="font-mono text-xs text-slate-500 mt-1" id="score-max-display">/ 200</span>
+            </div>
+          </div>
+          <div class="text-center">
+            <p class="font-display text-2xl font-semibold text-cyan-400" id="score-percent-display">—%</p>
+            <p class="text-xs text-slate-500 mt-1">of total marks</p>
+          </div>
+          <!-- Percentile block -->
+          <div class="mt-5 w-full border-t border-slate-800 pt-4 text-center">
+            <p class="font-mono text-xs text-slate-500 uppercase tracking-widest mb-1">Est. Percentile</p>
+            <p class="font-display text-2xl text-amber-400 font-semibold" id="percentile-display">—</p>
+            <p class="font-mono text-xs text-slate-600 mt-1" id="percentile-shift-label">Select shift for estimate</p>
+          </div>
+        </div>
+
+        <!-- Stat cards 3-column grid -->
+        <div class="lg:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-5 opacity-0 animate-fade-up stagger-3" style="opacity:0">
+
+          <!-- Correct -->
+          <div class="glass rounded-2xl p-5 border-t-2 border-emerald-400/40">
+            <div class="flex items-start justify-between mb-4">
+              <div class="w-10 h-10 rounded-xl bg-emerald-400/10 flex items-center justify-center">
+                <svg class="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                </svg>
+              </div>
+              <span class="font-mono text-xs text-slate-600 bg-slate-800 px-2 py-1 rounded-lg">+marks</span>
+            </div>
+            <p class="font-display text-3xl text-emerald-400 mb-1" id="stat-correct">—</p>
+            <p class="text-xs text-slate-500 font-mono">Correct Answers</p>
+          </div>
+
+          <!-- Incorrect -->
+          <div class="glass rounded-2xl p-5 border-t-2 border-rose-400/40">
+            <div class="flex items-start justify-between mb-4">
+              <div class="w-10 h-10 rounded-xl bg-rose-400/10 flex items-center justify-center">
+                <svg class="w-5 h-5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </div>
+              <span class="font-mono text-xs text-slate-600 bg-slate-800 px-2 py-1 rounded-lg">no penalty</span>
+            </div>
+            <p class="font-display text-3xl text-rose-400 mb-1" id="stat-incorrect">—</p>
+            <p class="text-xs text-slate-500 font-mono">Incorrect Answers</p>
+          </div>
+
+          <!-- Unattempted -->
+          <div class="glass rounded-2xl p-5 border-t-2 border-slate-600/40">
+            <div class="flex items-start justify-between mb-4">
+              <div class="w-10 h-10 rounded-xl bg-slate-700/40 flex items-center justify-center">
+                <svg class="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4"/>
+                </svg>
+              </div>
+              <span class="font-mono text-xs text-slate-600 bg-slate-800 px-2 py-1 rounded-lg">0 marks</span>
+            </div>
+            <p class="font-display text-3xl text-slate-400 mb-1" id="stat-unattempted">—</p>
+            <p class="text-xs text-slate-500 font-mono">Unattempted</p>
+          </div>
+
+          <!-- Accuracy rate -->
+          <div class="glass rounded-2xl p-5 sm:col-span-3">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+              <p class="font-mono text-xs text-slate-500 uppercase tracking-widest">Attempt Accuracy</p>
+              <span class="font-mono text-xs text-cyan-400" id="accuracy-label">—</span>
+            </div>
+            <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+              <div id="accuracy-bar" class="prog-bar h-full rounded-full bg-gradient-to-r from-cyan-500 to-emerald-400" style="width:0%"></div>
+            </div>
+            <p class="text-xs text-slate-600 mt-2 font-mono">Correct ÷ Total Attempted</p>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── ROW 2: Percentile Context Banner ── -->
+      <div id="percentile-banner" class="glass rounded-2xl p-5 mb-6 opacity-0 animate-fade-up stagger-3b" style="opacity:0; animation-delay:0.3s">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center flex-shrink-0">
+              <svg class="w-6 h-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/>
+              </svg>
+            </div>
+            <div>
+              <p class="font-display text-white text-base" id="percentile-headline">Estimated Percentile</p>
+              <p class="font-mono text-xs text-slate-500 mt-0.5" id="percentile-subtext">Based on 2024 result normalisation</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-6">
+            <div class="text-center">
+              <p class="font-mono text-xs text-slate-500 mb-1">Score</p>
+              <p class="font-display text-xl text-white" id="banner-score">—</p>
+            </div>
+            <div class="w-px h-10 bg-slate-800"></div>
+            <div class="text-center">
+              <p class="font-mono text-xs text-slate-500 mb-1">Shift Difficulty</p>
+              <p class="font-mono text-sm font-semibold" id="banner-difficulty">—</p>
+            </div>
+            <div class="w-px h-10 bg-slate-800"></div>
+            <div class="text-center">
+              <p class="font-mono text-xs text-slate-500 mb-1">Percentile Band</p>
+              <p class="font-mono text-sm font-semibold text-amber-400" id="banner-range">—</p>
+            </div>
+          </div>
+        </div>
+        <p class="font-mono text-xs text-slate-600 mt-3 border-t border-slate-800 pt-3">
+          ⚠ Percentile estimates are based on previous year (2024) cut-off data and shift-difficulty normalisation. Actual results may vary. This is not an official prediction.
+        </p>
+      </div>
+
+      <!-- ── ROW 3: Subject Breakdown ── -->
+      <div class="glass rounded-2xl p-6 mb-6 opacity-0 animate-fade-up stagger-4" style="opacity:0">
+        <h3 class="font-display text-white text-lg mb-6 flex items-center gap-2">
+          <span class="w-1 h-5 rounded-full bg-cyan-400 block"></span>
+          Subject-wise Breakdown
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+
+          <!-- Physics -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-blue-400"></span>
+                <span class="font-mono text-sm text-white">Physics</span>
+              </div>
+              <span class="font-mono text-sm font-semibold" id="phys-score-label">— / 50</span>
+            </div>
+            <div class="w-full h-3 bg-slate-800 rounded-full overflow-hidden mb-3">
+              <div id="phys-bar" class="prog-bar h-full rounded-full bg-blue-400" style="width:0%"></div>
+            </div>
+            <div class="grid grid-cols-3 gap-2 text-center">
+              <div class="bg-slate-800/60 rounded-lg p-2">
+                <p class="font-mono text-emerald-400 text-sm font-semibold" id="phys-correct">—</p>
+                <p class="text-slate-600 text-xs">Correct</p>
+              </div>
+              <div class="bg-slate-800/60 rounded-lg p-2">
+                <p class="font-mono text-rose-400 text-sm font-semibold" id="phys-wrong">—</p>
+                <p class="text-slate-600 text-xs">Wrong</p>
+              </div>
+              <div class="bg-slate-800/60 rounded-lg p-2">
+                <p class="font-mono text-slate-400 text-sm font-semibold" id="phys-skip">—</p>
+                <p class="text-slate-600 text-xs">Skipped</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chemistry -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-purple-400"></span>
+                <span class="font-mono text-sm text-white">Chemistry</span>
+              </div>
+              <span class="font-mono text-sm font-semibold" id="chem-score-label">— / 50</span>
+            </div>
+            <div class="w-full h-3 bg-slate-800 rounded-full overflow-hidden mb-3">
+              <div id="chem-bar" class="prog-bar h-full rounded-full bg-purple-400" style="width:0%"></div>
+            </div>
+            <div class="grid grid-cols-3 gap-2 text-center">
+              <div class="bg-slate-800/60 rounded-lg p-2">
+                <p class="font-mono text-emerald-400 text-sm font-semibold" id="chem-correct">—</p>
+                <p class="text-slate-600 text-xs">Correct</p>
+              </div>
+              <div class="bg-slate-800/60 rounded-lg p-2">
+                <p class="font-mono text-rose-400 text-sm font-semibold" id="chem-wrong">—</p>
+                <p class="text-slate-600 text-xs">Wrong</p>
+              </div>
+              <div class="bg-slate-800/60 rounded-lg p-2">
+                <p class="font-mono text-slate-400 text-sm font-semibold" id="chem-skip">—</p>
+                <p class="text-slate-600 text-xs">Skipped</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mathematics -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                <span class="font-mono text-sm text-white">Mathematics</span>
+              </div>
+              <span class="font-mono text-sm font-semibold" id="math-score-label">— / 100</span>
+            </div>
+            <div class="w-full h-3 bg-slate-800 rounded-full overflow-hidden mb-3">
+              <div id="math-bar" class="prog-bar h-full rounded-full bg-amber-400" style="width:0%"></div>
+            </div>
+            <div class="grid grid-cols-3 gap-2 text-center">
+              <div class="bg-slate-800/60 rounded-lg p-2">
+                <p class="font-mono text-emerald-400 text-sm font-semibold" id="math-correct">—</p>
+                <p class="text-slate-600 text-xs">Correct</p>
+              </div>
+              <div class="bg-slate-800/60 rounded-lg p-2">
+                <p class="font-mono text-rose-400 text-sm font-semibold" id="math-wrong">—</p>
+                <p class="text-slate-600 text-xs">Wrong</p>
+              </div>
+              <div class="bg-slate-800/60 rounded-lg p-2">
+                <p class="font-mono text-slate-400 text-sm font-semibold" id="math-skip">—</p>
+                <p class="text-slate-600 text-xs">Skipped</p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- PCM score comparison bar -->
+        <div class="mt-8 pt-6 border-t border-slate-800">
+          <p class="font-mono text-xs text-slate-500 uppercase tracking-widest mb-4">Score Distribution</p>
+          <div class="flex h-6 rounded-full overflow-hidden gap-0.5">
+            <div id="dist-phys"  class="bg-blue-400   transition-all duration-1000 flex items-center justify-center" style="width:0%">
+              <span class="font-mono text-xs text-navy-950 font-semibold hidden sm:block" id="dist-phys-label"></span>
+            </div>
+            <div id="dist-chem"  class="bg-purple-400 transition-all duration-1000 flex items-center justify-center" style="width:0%" >
+              <span class="font-mono text-xs text-navy-950 font-semibold hidden sm:block" id="dist-chem-label"></span>
+            </div>
+            <div id="dist-math"  class="bg-amber-400  transition-all duration-1000 flex items-center justify-center" style="width:0%">
+              <span class="font-mono text-xs text-navy-950 font-semibold hidden sm:block" id="dist-math-label"></span>
+            </div>
+          </div>
+          <div class="flex gap-6 mt-3 text-xs font-mono text-slate-500">
+            <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-blue-400 inline-block"></span>Physics</span>
+            <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-purple-400 inline-block"></span>Chemistry</span>
+            <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>Mathematics (×2)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ROW 3: Question Table ── -->
+      <div class="glass rounded-2xl overflow-hidden opacity-0 animate-fade-up stagger-5" style="opacity:0">
+
+        <!-- Table header -->
+        <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+          <h3 class="font-display text-white text-lg flex items-center gap-2">
+            <span class="w-1 h-5 rounded-full bg-amber-400 block"></span>
+            Question-by-Question Breakdown
+          </h3>
+          <div class="flex items-center gap-3 text-xs font-mono">
+            <span class="flex items-center gap-1.5 text-emerald-400"><span class="w-2 h-2 rounded-sm bg-emerald-400/30 border-l-2 border-emerald-400 inline-block"></span>Correct</span>
+            <span class="flex items-center gap-1.5 text-rose-400"><span class="w-2 h-2 rounded-sm bg-rose-400/30 border-l-2 border-rose-400 inline-block"></span>Incorrect</span>
+            <span class="flex items-center gap-1.5 text-slate-500"><span class="w-2 h-2 rounded-sm bg-slate-700 border-l-2 border-slate-600 inline-block"></span>Skipped</span>
+          </div>
+        </div>
+
+        <!-- Table wrapper (scrollable) -->
+        <div class="overflow-x-auto max-h-[520px] overflow-y-auto">
+          <table class="w-full text-sm border-collapse">
+            <thead class="sticky top-0 z-10">
+              <tr class="bg-navy-900/90 backdrop-blur-sm border-b border-slate-800">
+                <th class="font-mono text-xs text-slate-500 uppercase tracking-widest text-left px-4 py-3 w-16">#</th>
+                <th class="font-mono text-xs text-slate-500 uppercase tracking-widest text-left px-4 py-3">Subject</th>
+                <th class="font-mono text-xs text-slate-500 uppercase tracking-widest text-left px-4 py-3">Correct Option ID</th>
+                <th class="font-mono text-xs text-slate-500 uppercase tracking-widest text-left px-4 py-3">Your Response</th>
+                <th class="font-mono text-xs text-slate-500 uppercase tracking-widest text-center px-4 py-3">Marks</th>
+                <th class="font-mono text-xs text-slate-500 uppercase tracking-widest text-center px-4 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody id="question-table-body">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+    </div> <!-- /results-view -->
+
+  </main><!-- /main -->
+
+  <!-- ═══════════════════════════════════════════════════════════
+       FOOTER
+  ════════════════════════════════════════════════════════════════ -->
+  <footer class="relative z-10 border-t border-slate-800/60 mt-16">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <p class="font-mono text-xs text-slate-600">MHT-CET Analyzer · All processing is 100% local · No data is transmitted</p>
+      <p class="font-mono text-xs text-slate-700">PCM: Physics(50) + Chemistry(50) + Maths(100) = 200 marks</p>
+    </div>
+  </footer>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       TOAST NOTIFICATION
+  ════════════════════════════════════════════════════════════════ -->
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-start gap-3 px-5 py-4 rounded-xl glass border max-w-md w-[90vw]">
+    <div id="toast-icon" class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center mt-0.5">
+      <!-- Injected by JS -->
+    </div>
+    <div>
+      <p class="font-mono text-sm font-semibold" id="toast-title"></p>
+      <p class="font-mono text-xs text-slate-400 mt-1 leading-relaxed" id="toast-msg"></p>
+    </div>
+    <button onclick="hideToast()" class="flex-shrink-0 ml-auto text-slate-600 hover:text-slate-400">
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════
+       JAVASCRIPT ENGINE
+  ════════════════════════════════════════════════════════════════ -->
+  <script>
+  /**
+   * ╔══════════════════════════════════════════════════════════╗
+   * ║         MHT-CET SCORE PREDICTOR – CORE ENGINE           ║
+   * ║  All parsing happens client-side. Zero network calls.    ║
+   * ╚══════════════════════════════════════════════════════════╝
+   */
+
+  // ─── Shift difficulty data (2025 paper analysis) ─────────────
+  /**
+   * Difficulty categories: 'easy' | 'moderate' | 'hard'
+   * Mapped from the analysis table provided.
+   */
+  const SHIFT_DATA = {
+    '11 Apr|Shift 1': { overall: 'Moderate',       category: 'moderate', remark: 'First paper; balanced' },
+    '11 Apr|Shift 2': { overall: 'Moderate-Tough',  category: 'hard',     remark: 'Harder than Shift 1' },
+    '13 Apr|Shift 1': { overall: 'Moderate',        category: 'moderate', remark: 'NCERT-oriented' },
+    '13 Apr|Shift 2': { overall: 'Moderate-Tough',  category: 'hard',     remark: 'Concept-heavy maths' },
+    '15 Apr|Shift 1': { overall: 'Tough',            category: 'hard',     remark: 'One of toughest maths shifts' },
+    '15 Apr|Shift 2': { overall: 'Tough',            category: 'hard',     remark: 'Long calculations' },
+    '16 Apr|Shift 1': { overall: 'Moderate-Tough',  category: 'hard',     remark: 'Widely discussed as difficult' },
+    '16 Apr|Shift 2': { overall: 'Moderate',        category: 'moderate', remark: 'Better than Shift 1' },
+    '17 Apr|Shift 1': { overall: 'Easy-Moderate',   category: 'easy',     remark: 'Widely called easiest shift' },
+    '17 Apr|Shift 2': { overall: 'Moderate',        category: 'moderate', remark: 'Time pressure' },
+    '18 Apr|Shift 1': { overall: 'Moderate',        category: 'moderate', remark: 'Balanced paper' },
+    '18 Apr|Shift 2': { overall: 'Moderate-Tough',  category: 'hard',     remark: 'More calculus' },
+    '19 Apr|Shift 1': { overall: 'Easy-Moderate',   category: 'easy',     remark: 'High-scoring shift' },
+    '19 Apr|Shift 2': { overall: 'Moderate',        category: 'moderate', remark: 'Slightly lengthy' },
+    '20 Apr|Shift 1': { overall: 'Moderate-Tough',  category: 'hard',     remark: 'Higher algebra weightage' },
+    '20 Apr|Shift 2': { overall: 'Tough',            category: 'hard',     remark: 'Among hardest overall' },
+  };
+
+  /**
+   * Percentile lookup table (based on previous year results, normalised by difficulty).
+   * Each entry: [minScore, maxScore, minPercentile, maxPercentile]
+   * Scores are inclusive lower bound; percentile is interpolated linearly within the band.
+   */
+  const PERCENTILE_TABLE = {
+    hard: [
+      [170, 200,  99.95, 99.99],
+      [160, 170,  99.80, 99.95],
+      [150, 160,  99.50, 99.80],
+      [140, 150,  99.10, 99.50],
+      [130, 140,  98.50, 99.10],
+      [120, 130,  97.50, 98.50],
+      [110, 120,  96.00, 97.50],
+      [100, 110,  94.00, 96.00],
+      [ 90, 100,  90.00, 94.00],
+      [ 80,  90,  85.00, 90.00],
+      [ 70,  80,  78.00, 85.00],
+      [ 60,  70,  68.00, 78.00],
+      [  0,  60,  0.00,  68.00],
+    ],
+    moderate: [
+      [170, 200,  99.90, 99.99],
+      [160, 170,  99.70, 99.90],
+      [150, 160,  99.30, 99.70],
+      [140, 150,  98.80, 99.30],
+      [130, 140,  98.00, 98.80],
+      [120, 130,  96.80, 98.00],
+      [110, 120,  95.00, 96.80],
+      [100, 110,  92.50, 95.00],
+      [ 90, 100,  88.00, 92.50],
+      [ 80,  90,  82.00, 88.00],
+      [ 70,  80,  74.00, 82.00],
+      [ 60,  70,  62.00, 74.00],
+      [  0,  60,  0.00,  62.00],
+    ],
+    easy: [
+      [170, 200,  99.85, 99.99],
+      [160, 170,  99.50, 99.85],
+      [150, 160,  99.00, 99.50],
+      [140, 150,  98.30, 99.00],
+      [130, 140,  97.50, 98.30],
+      [120, 130,  95.80, 97.50],
+      [110, 120,  93.50, 95.80],
+      [100, 110,  90.00, 93.50],
+      [ 90, 100,  84.00, 90.00],
+      [ 80,  90,  78.00, 84.00],
+      [ 70,  80,  68.00, 78.00],
+      [ 60,  70,  55.00, 68.00],
+      [  0,  60,  0.00,  55.00],
+    ],
+  };
+
+  /**
+   * Estimate percentile for a given score and difficulty category.
+   * Uses linear interpolation within the matched band.
+   * @param {number} score
+   * @param {'easy'|'moderate'|'hard'} category
+   * @returns {{ percentile: number, range: string }}
+   */
+  function estimatePercentile(score, category) {
+    const table = PERCENTILE_TABLE[category] || PERCENTILE_TABLE.moderate;
+    for (const [lo, hi, pLo, pHi] of table) {
+      if (score >= lo && score < hi) {
+        // Linear interpolation: as score goes lo→hi, percentile goes pLo→pHi
+        const t = (score - lo) / (hi - lo);
+        const percentile = pLo + t * (pHi - pLo);
+        return {
+          percentile: Math.round(percentile * 100) / 100,
+          range: `${pLo.toFixed(2)} – ${pHi.toFixed(2)}`,
+        };
+      }
+    }
+    // Score = 200 edge case
+    if (score >= 200) return { percentile: 99.99, range: '99.99+' };
+    return { percentile: 0, range: '< 55.00' };
+  }
+
+  // Difficulty badge styling
+  const DIFFICULTY_STYLES = {
+    easy:     { bg: 'bg-emerald-400/15 text-emerald-400 border border-emerald-400/30', label: 'Easy–Moderate' },
+    moderate: { bg: 'bg-amber-400/15 text-amber-400 border border-amber-400/30',       label: 'Moderate' },
+    hard:     { bg: 'bg-rose-400/15 text-rose-400 border border-rose-400/30',           label: 'Hard–Tough' },
+  };
+
+  // ─── Shift selector preview wiring ───────────────────────────
+  function updateShiftPreview() {
+    const date   = document.getElementById('shift-date').value;
+    const slot   = document.getElementById('shift-slot').value;
+    const preview = document.getElementById('shift-preview');
+    const badge   = document.getElementById('shift-difficulty-badge');
+    const remark  = document.getElementById('shift-remark');
+
+    if (!date || !slot) { preview.classList.add('hidden'); return; }
+
+    const key  = `${date}|${slot}`;
+    const info = SHIFT_DATA[key];
+    if (!info) { preview.classList.add('hidden'); return; }
+
+    const style = DIFFICULTY_STYLES[info.category];
+    badge.className = `px-2.5 py-0.5 rounded-full font-semibold text-xs ${style.bg}`;
+    badge.textContent = info.overall;
+    remark.textContent = `· ${info.remark}`;
+    preview.classList.remove('hidden');
+  }
+
+  document.getElementById('shift-date').addEventListener('change', updateShiftPreview);
+  document.getElementById('shift-slot').addEventListener('change', updateShiftPreview);
+
+  // ─── Element references ─────────────────────────────────────
+  const uploadView   = document.getElementById('upload-view');
+  const resultsView  = document.getElementById('results-view');
+  const dropzone     = document.getElementById('dropzone');
+  const fileInput    = document.getElementById('file-input');
+  const loadingState = document.getElementById('loading-state');
+  const loadingMsg   = document.getElementById('loading-msg');
+
+  // ─── Toast helpers ───────────────────────────────────────────
+  let toastTimer;
+
+  /**
+   * Show a toast notification.
+   * @param {'success'|'error'|'warn'} type
+   * @param {string} title
+   * @param {string} msg
+   * @param {number} duration  ms before auto-hide (0 = manual only)
+   */
+  function showToast(type, title, msg, duration = 6000) {
+    const toast     = document.getElementById('toast');
+    const toastIcon = document.getElementById('toast-icon');
+    const toastTitle = document.getElementById('toast-title');
+    const toastBody  = document.getElementById('toast-msg');
+
+    // Icon + colour by type
+    const cfg = {
+      success: { bg: 'bg-emerald-400/20', color: 'text-emerald-400', svg: '<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>' },
+      error:   { bg: 'bg-rose-400/20',    color: 'text-rose-400',    svg: '<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>' },
+      warn:    { bg: 'bg-amber-400/20',   color: 'text-amber-400',   svg: '<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>' },
+    }[type] || cfg.warn;
+
+    toastIcon.className = `flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center mt-0.5 ${cfg.bg}`;
+    toastIcon.innerHTML = `<svg class="w-3.5 h-3.5 ${cfg.color}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">${cfg.svg}</svg>`;
+    toastTitle.textContent = title;
+    toastTitle.className   = `font-mono text-sm font-semibold ${cfg.color}`;
+    toastBody.textContent  = msg;
+
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    if (duration > 0) toastTimer = setTimeout(hideToast, duration);
+  }
+
+  function hideToast() {
+    document.getElementById('toast').classList.remove('show');
+  }
+
+  // ─── View switching ──────────────────────────────────────────
+  function showView(view) {
+    uploadView.classList.remove('active');
+    resultsView.classList.remove('active');
+    view.classList.add('active');
+  }
+
+  function resetApp() {
+    fileInput.value = '';
+    loadingState.classList.add('hidden');
+    dropzone.style.display = '';
+    showView(uploadView);
+    // Clear any previous animation states on result cards
+    document.querySelectorAll('#results-view .animate-fade-up').forEach(el => {
+      el.style.opacity = '0';
+    });
+  }
+
+  // ─── Drag-and-drop wiring ────────────────────────────────────
+  ['dragenter','dragover'].forEach(evt =>
+    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.add('drag-over'); })
+  );
+  ['dragleave','drop'].forEach(evt =>
+    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove('drag-over'); })
+  );
+  dropzone.addEventListener('drop', e => {
+    const file = e.dataTransfer.files[0];
+    if (file) processFile(file);
+  });
+  fileInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) processFile(file);
+  });
+
+  // ─── File validation ─────────────────────────────────────────
+  function validateFile(file) {
+    const name = (file.name || '').toLowerCase();
+    if (!name.endsWith('.mht') && !name.endsWith('.mhtml')) {
+      showToast('error', 'Invalid File Type', 'Please upload a .mht or .mhtml Web Archive file. Save the response sheet from the CET portal using Ctrl+S → Web Archive.');
+      return false;
+    }
+    // 50 MB sanity guard
+    if (file.size > 50 * 1024 * 1024) {
+      showToast('warn', 'File Too Large', 'The file exceeds 50 MB. Are you sure this is the correct response sheet?');
+      return false;
+    }
+    return true;
+  }
+
+  // ─── MHTML → clean HTML string ───────────────────────────────
+  /**
+   * MHT files use MIME multipart encoding.
+   * The HTML body is encoded as "quoted-printable" which means:
+   *   • Soft line breaks:  `=\r\n` or `=\n`  → should be removed (line continuation)
+   *   • Encoded chars:     `=XX` (hex)         → decoded to actual char
+   * We also need to find the HTML segment among other MIME parts.
+   */
+  function decodeMHTML(rawText) {
+    // 1. Extract only the HTML content-type segment
+    //    MHTML files can contain multiple parts (images, CSS, etc.)
+    //    The HTML part starts after the first Content-Type: text/html header
+    let htmlSegment = rawText;
+
+    // Find boundary marker if it exists
+    const boundaryMatch = rawText.match(/boundary="?([^"\r\n;]+)"?/i);
+    if (boundaryMatch) {
+      const boundary = boundaryMatch[1];
+      const parts = rawText.split('--' + boundary);
+      // Find the part with text/html
+      for (const part of parts) {
+        if (/Content-Type:\s*text\/html/i.test(part)) {
+          // Strip part headers (everything before first blank line)
+          const blankLine = part.search(/\r?\n\r?\n/);
+          htmlSegment = blankLine !== -1 ? part.slice(blankLine) : part;
+          break;
+        }
+      }
+    } else {
+      // No boundary – might be a simpler MHTML. Try to find <html tag.
+      const htmlStart = rawText.search(/<html[\s>]/i);
+      if (htmlStart !== -1) htmlSegment = rawText.slice(htmlStart);
+    }
+
+    // 2. Decode quoted-printable encoding
+    //    Step A: Remove soft line breaks (=\r\n or =\n means "continue this line")
+    let decoded = htmlSegment.replace(/=\r\n|=\n/g, '');
+
+    //    Step B: Replace =XX hex sequences with actual characters
+    decoded = decoded.replace(/=([0-9A-Fa-f]{2})/g, (_, hex) =>
+      String.fromCharCode(parseInt(hex, 16))
+    );
+
+    return decoded;
+  }
+
+  // ─── Question data extraction ─────────────────────────────────
+  /**
+   * MHT-CET response sheets use a table-based layout where each question has
+   * two key pieces of text:
+   *   "Correct Option : <ID>"   – a 6-to-8 digit numeric ID
+   *   "Candidate Response : <ID>" or "Candidate Response : --" / "Not Attempted"
+   *
+   * We search the entire text content of the document for these patterns.
+   * Strategy: collect all text nodes, scan with regex.
+   */
+  function extractQuestions(doc) {
+    // Get all visible text from the document
+    const body = doc.body;
+    if (!body) return null;
+    const fullText = body.innerText || body.textContent || '';
+
+    // ── Pattern approach ──────────────────────────────────────
+    // Match blocks like:
+    //   Correct Option : 12345678
+    //   Candidate Response : 12345678  OR  --  OR  Not Attempted
+    //
+    // We'll scan for pairs in sequence. Both patterns can appear with varying
+    // spacing and colon variants (` : `, `:`, `  :  ` etc.)
+
+    const questions = [];
+
+    // Regex to find a correct option ID (6–9 digits)
+    const correctRe   = /Correct\s+(?:Option|Answer)\s*[:\-]\s*([0-9]{5,10}|--)/gi;
+    // Regex to find candidate response (ID, --, or text like "Not Attempted")
+    const responseRe  = /Candidate\s+Response\s*[:\-]\s*([0-9]{5,10}|--|Not\s+Attempted)/gi;
+
+    const correctMatches  = [...fullText.matchAll(correctRe)];
+    const responseMatches = [...fullText.matchAll(responseRe)];
+
+    if (correctMatches.length === 0 || responseMatches.length === 0) {
+      return null; // Trigger parse-fail error
+    }
+
+    // Zip the two arrays together (they should be parallel)
+    const count = Math.min(correctMatches.length, responseMatches.length);
+    for (let i = 0; i < count; i++) {
+      const correct  = correctMatches[i][1].trim();
+      const response = responseMatches[i][1].trim().replace(/\s+/g, ' ');
+      questions.push({ correct, response });
+    }
+
+    return questions.length > 0 ? questions : null;
+  }
+
+  // ─── Scoring engine ───────────────────────────────────────────
+  /**
+   * Marking scheme:
+   *   Questions  1–50  → Physics     → +1 for correct, 0 otherwise
+   *   Questions 51–100 → Chemistry   → +1 for correct, 0 otherwise
+   *   Questions 101–150→ Mathematics → +2 for correct, 0 otherwise
+   * Total maximum: 50 + 50 + 100 = 200 marks
+   */
+  function scoreQuestions(questions) {
+    const results = questions.map((q, idx) => {
+      const qNum     = idx + 1;
+      // Determine subject
+      let subject, maxPerQ;
+      if (qNum <= 50)       { subject = 'Physics';     maxPerQ = 1; }
+      else if (qNum <= 100) { subject = 'Chemistry';   maxPerQ = 1; }
+      else                  { subject = 'Mathematics'; maxPerQ = 2; }
+
+      // Determine status
+      const isAttempted = q.response !== '--' && !/not\s+attempted/i.test(q.response);
+      const isCorrect   = isAttempted && (q.correct === q.response);
+      const isWrong     = isAttempted && !isCorrect;
+      const marks       = isCorrect ? maxPerQ : 0;
+
+      return {
+        qNum,
+        subject,
+        correct:   q.correct,
+        response:  q.response,
+        attempted: isAttempted,
+        isCorrect,
+        isWrong,
+        isSkipped: !isAttempted,
+        marks,
+      };
+    });
+
+    // Aggregate
+    const totalScore  = results.reduce((s, r) => s + r.marks, 0);
+    const totalMax    = 200;
+
+    const totalCorrect     = results.filter(r => r.isCorrect).length;
+    const totalIncorrect   = results.filter(r => r.isWrong).length;
+    const totalUnattempted = results.filter(r => r.isSkipped).length;
+    const totalAttempted   = results.filter(r => r.attempted).length;
+
+    const accuracy = totalAttempted > 0 ? (totalCorrect / totalAttempted) * 100 : 0;
+
+    const physics   = results.filter(r => r.subject === 'Physics');
+    const chemistry = results.filter(r => r.subject === 'Chemistry');
+    const maths     = results.filter(r => r.subject === 'Mathematics');
+
+    const subjectStats = (arr, perQ) => ({
+      correct:   arr.filter(r => r.isCorrect).length,
+      wrong:     arr.filter(r => r.isWrong).length,
+      skipped:   arr.filter(r => r.isSkipped).length,
+      score:     arr.reduce((s, r) => s + r.marks, 0),
+      maxScore:  arr.length * perQ,
+    });
+
+    return {
+      results,
+      totalScore,
+      totalMax,
+      totalCorrect,
+      totalIncorrect,
+      totalUnattempted,
+      totalAttempted,
+      accuracy,
+      physics:   subjectStats(physics,   1),
+      chemistry: subjectStats(chemistry, 1),
+      maths:     subjectStats(maths,     2),
+    };
+  }
+
+  // ─── Render dashboard ─────────────────────────────────────────
+  function renderDashboard(data, fileName, shiftInfo) {
+    // Switch view
+    showView(resultsView);
+
+    // File name
+    document.getElementById('file-name-display').textContent = fileName;
+
+    // Hero ring animation
+    const ringEl    = document.getElementById('score-ring-fg');
+    const circumf   = 2 * Math.PI * 90; // 565.48
+    const pct       = data.totalScore / data.totalMax;
+    const offset    = circumf * (1 - pct);
+    setTimeout(() => { ringEl.style.strokeDashoffset = offset; }, 300);
+
+    // Hero score text
+    document.getElementById('score-display').textContent      = data.totalScore;
+    document.getElementById('score-max-display').textContent  = `/ ${data.totalMax}`;
+    document.getElementById('score-percent-display').textContent = `${(pct * 100).toFixed(1)}%`;
+
+    // ── Percentile display ────────────────────────────────────
+    const percEl        = document.getElementById('percentile-display');
+    const percShiftLbl  = document.getElementById('percentile-shift-label');
+
+    if (shiftInfo) {
+      const est = estimatePercentile(data.totalScore, shiftInfo.category);
+      percEl.textContent       = `${est.percentile.toFixed(2)}`;
+      percShiftLbl.textContent = `Range: ${est.range} · ${shiftInfo.overall}`;
+      // Colour by category
+      const colours = { easy: 'text-emerald-400', moderate: 'text-amber-400', hard: 'text-rose-400' };
+      percEl.className = `font-display text-2xl font-semibold ${colours[shiftInfo.category] || 'text-amber-400'}`;
+    } else {
+      percEl.textContent       = 'N/A';
+      percShiftLbl.textContent = 'No shift selected — go back & choose shift';
+      percEl.className         = 'font-display text-2xl font-semibold text-slate-500';
+    }
+
+    // ── Percentile context banner ─────────────────────────────
+    document.getElementById('banner-score').textContent = `${data.totalScore} / ${data.totalMax}`;
+    if (shiftInfo) {
+      const est = estimatePercentile(data.totalScore, shiftInfo.category);
+      const diffColours = { easy: 'text-emerald-400', moderate: 'text-amber-400', hard: 'text-rose-400' };
+      const diffEl = document.getElementById('banner-difficulty');
+      diffEl.textContent  = shiftInfo.overall;
+      diffEl.className    = `font-mono text-sm font-semibold ${diffColours[shiftInfo.category] || 'text-amber-400'}`;
+      document.getElementById('banner-range').textContent     = est.range;
+      document.getElementById('percentile-headline').textContent = `~${est.percentile.toFixed(2)} Percentile`;
+      document.getElementById('percentile-subtext').textContent  = `${shiftInfo.remark} · Based on 2024 cut-off normalisation`;
+    } else {
+      document.getElementById('banner-difficulty').textContent = 'No shift selected';
+      document.getElementById('banner-range').textContent      = '—';
+      document.getElementById('percentile-headline').textContent = 'Percentile Unavailable';
+      document.getElementById('percentile-subtext').textContent  = 'Select your exam shift on the upload page to get a percentile estimate';
+    }
+
+    // Stat cards
+    document.getElementById('stat-correct').textContent     = data.totalCorrect;
+    document.getElementById('stat-incorrect').textContent   = data.totalIncorrect;
+    document.getElementById('stat-unattempted').textContent = data.totalUnattempted;
+
+    // Accuracy bar
+    const accPct = data.accuracy.toFixed(1);
+    document.getElementById('accuracy-label').textContent = `${accPct}% of attempted`;
+    setTimeout(() => { document.getElementById('accuracy-bar').style.width = `${data.accuracy}%`; }, 500);
+
+    // Physics
+    const ph = data.physics;
+    document.getElementById('phys-score-label').textContent = `${ph.score} / ${ph.maxScore}`;
+    document.getElementById('phys-correct').textContent = ph.correct;
+    document.getElementById('phys-wrong').textContent   = ph.wrong;
+    document.getElementById('phys-skip').textContent    = ph.skipped;
+    setTimeout(() => { document.getElementById('phys-bar').style.width = `${(ph.score / ph.maxScore) * 100}%`; }, 600);
+
+    // Chemistry
+    const ch = data.chemistry;
+    document.getElementById('chem-score-label').textContent = `${ch.score} / ${ch.maxScore}`;
+    document.getElementById('chem-correct').textContent = ch.correct;
+    document.getElementById('chem-wrong').textContent   = ch.wrong;
+    document.getElementById('chem-skip').textContent    = ch.skipped;
+    setTimeout(() => { document.getElementById('chem-bar').style.width = `${(ch.score / ch.maxScore) * 100}%`; }, 700);
+
+    // Maths
+    const ma = data.maths;
+    document.getElementById('math-score-label').textContent = `${ma.score} / ${ma.maxScore}`;
+    document.getElementById('math-correct').textContent = ma.correct;
+    document.getElementById('math-wrong').textContent   = ma.wrong;
+    document.getElementById('math-skip').textContent    = ma.skipped;
+    setTimeout(() => { document.getElementById('math-bar').style.width = `${(ma.score / ma.maxScore) * 100}%`; }, 800);
+
+    // Distribution bar (proportional to total score contribution)
+    const totalForDist = data.totalScore || 1; // avoid div/0
+    const physPct = (ph.score / data.totalMax * 100).toFixed(1);
+    const chemPct = (ch.score / data.totalMax * 100).toFixed(1);
+    const mathPct = (ma.score / data.totalMax * 100).toFixed(1);
+    setTimeout(() => {
+      document.getElementById('dist-phys').style.width = `${physPct}%`;
+      document.getElementById('dist-chem').style.width = `${chemPct}%`;
+      document.getElementById('dist-math').style.width = `${mathPct}%`;
+      document.getElementById('dist-phys-label').textContent = `Phy ${ph.score}`;
+      document.getElementById('dist-chem-label').textContent = `Chem ${ch.score}`;
+      document.getElementById('dist-math-label').textContent = `Math ${ma.score}`;
+    }, 600);
+
+    // Question table
+    const tbody = document.getElementById('question-table-body');
+    tbody.innerHTML = '';
+
+    data.results.forEach(row => {
+      const tr = document.createElement('tr');
+      let rowClass, statusBadge, marksText, marksColor;
+
+      if (row.isCorrect) {
+        rowClass    = 'tbl-correct';
+        statusBadge = `<span class="inline-flex items-center gap-1 text-emerald-400 font-mono text-xs bg-emerald-400/10 border border-emerald-400/20 rounded-full px-2 py-0.5">
+                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>Correct
+                       </span>`;
+        marksColor  = 'text-emerald-400';
+        marksText   = `+${row.marks}`;
+      } else if (row.isWrong) {
+        rowClass    = 'tbl-incorrect';
+        statusBadge = `<span class="inline-flex items-center gap-1 text-rose-400 font-mono text-xs bg-rose-400/10 border border-rose-400/20 rounded-full px-2 py-0.5">
+                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>Incorrect
+                       </span>`;
+        marksColor  = 'text-rose-400';
+        marksText   = '0';
+      } else {
+        rowClass    = 'tbl-skipped';
+        statusBadge = `<span class="inline-flex items-center gap-1 text-slate-500 font-mono text-xs bg-slate-800 border border-slate-700 rounded-full px-2 py-0.5">
+                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4"/></svg>Skipped
+                       </span>`;
+        marksColor  = 'text-slate-600';
+        marksText   = '0';
+      }
+
+      const subjectColors = { Physics: 'text-blue-400', Chemistry: 'text-purple-400', Mathematics: 'text-amber-400' };
+      const subjectColor  = subjectColors[row.subject] || 'text-slate-400';
+
+      tr.className = `${rowClass} border-b border-slate-800/50 hover:brightness-125 transition-all`;
+      tr.innerHTML = `
+        <td class="px-4 py-3 font-mono text-sm text-slate-400">${row.qNum}</td>
+        <td class="px-4 py-3 font-mono text-xs ${subjectColor} font-semibold">${row.subject.slice(0,4).toUpperCase()}</td>
+        <td class="px-4 py-3 font-mono text-sm text-slate-300">${row.correct}</td>
+        <td class="px-4 py-3 font-mono text-sm ${row.isWrong ? 'text-rose-300' : row.isCorrect ? 'text-emerald-300' : 'text-slate-600'}">
+          ${row.isSkipped ? '<span class="text-slate-600">—</span>' : row.response}
+        </td>
+        <td class="px-4 py-3 font-mono text-sm ${marksColor} text-center font-semibold">${marksText}</td>
+        <td class="px-4 py-3 text-center">${statusBadge}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // Trigger staggered fade-up animations
+    setTimeout(() => {
+      document.querySelectorAll('#results-view .animate-fade-up').forEach(el => {
+        el.style.animation = 'none';
+        el.style.opacity   = '0';
+        void el.offsetHeight; // reflow
+        el.style.animation = '';
+      });
+    }, 50);
+
+    // Success toast
+    showToast('success', 'Analysis Complete!', `Parsed ${data.results.length} questions successfully. Your score: ${data.totalScore}/${data.totalMax}`, 5000);
+  }
+
+  // ─── Main processing pipeline ─────────────────────────────────
+  function processFile(file) {
+    if (!validateFile(file)) return;
+
+    // Show loading
+    dropzone.style.display = 'none';
+    loadingState.classList.remove('hidden');
+
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+      try {
+        setLoadingMsg('Decoding MHTML archive…');
+
+        const rawText = e.target.result;
+
+        // Step 1: Check this actually looks like an MHTML file
+        const isMhtml = /MIME-Version/i.test(rawText) || /<html[\s>]/i.test(rawText);
+        if (!isMhtml) {
+          throw new Error('NOT_MHTML');
+        }
+
+        setLoadingMsg('Stripping quoted-printable encoding…');
+        const cleanHtml = decodeMHTML(rawText);
+
+        setLoadingMsg('Parsing HTML document…');
+        const parser = new DOMParser();
+        const doc    = parser.parseFromString(cleanHtml, 'text/html');
+
+        setLoadingMsg('Extracting question data…');
+        const questions = extractQuestions(doc);
+
+        if (!questions) {
+          throw new Error('NO_QUESTIONS');
+        }
+
+        setLoadingMsg('Calculating scores…');
+        const data = scoreQuestions(questions);
+
+        // Gather shift selection (may be empty if user skipped)
+        const selDate = document.getElementById('shift-date').value;
+        const selSlot = document.getElementById('shift-slot').value;
+        const shiftKey  = selDate && selSlot ? `${selDate}|${selSlot}` : null;
+        const shiftInfo = shiftKey ? SHIFT_DATA[shiftKey] : null;
+
+        // Render with a tiny delay to show the last loading message
+        setTimeout(() => {
+          loadingState.classList.add('hidden');
+          renderDashboard(data, file.name, shiftInfo);
+        }, 400);
+
+      } catch (err) {
+        loadingState.classList.add('hidden');
+        dropzone.style.display = '';
+
+        if (err.message === 'NOT_MHTML') {
+          showToast('error', 'Not an MHT File', 'The file doesn\'t appear to be a valid MHTML Web Archive. Please save the response sheet from the CET portal as a Web Archive (.mht) file.', 0);
+        } else if (err.message === 'NO_QUESTIONS') {
+          showToast('error', 'Question Data Not Found',
+            'Could not find "Correct Option" or "Candidate Response" data in this file. Please verify you have uploaded the correct MHT-CET Official Response Sheet. Try re-downloading it from the portal.', 0);
+        } else {
+          showToast('error', 'Parse Error', `An unexpected error occurred: ${err.message}. Please try re-downloading the file.`, 0);
+          console.error('[MHT-CET Analyzer] Parse error:', err);
+        }
+      }
+    };
+
+    reader.onerror = function() {
+      loadingState.classList.add('hidden');
+      dropzone.style.display = '';
+      showToast('error', 'File Read Error', 'Could not read the file. Please check file permissions and try again.');
+    };
+
+    // Read as text (UTF-8) – MHTML is ASCII-based, this works fine
+    reader.readAsText(file, 'UTF-8');
+  }
+
+  function setLoadingMsg(msg) {
+    if (loadingMsg) loadingMsg.textContent = msg;
+  }
+
+  </script>
+
+</body>
+</html>
